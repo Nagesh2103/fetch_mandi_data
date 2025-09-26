@@ -21,7 +21,7 @@ LIMIT = 100
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Example source (Agmarknet daily prices page)
-SOURCE_URL = "https://agmarknet.gov.in/SearchCmmMkt.aspx"  # replace with exact mandi data listing page
+SOURCE_URL = "https://agmarknet.gov.in/DailyMarketReport/StateWiseMarketWiseDailyReport.aspx"  # replace with exact mandi data listing page
 
 def fetch_data():
     logging.info("Requesting URL: %s", SOURCE_URL)
