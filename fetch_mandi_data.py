@@ -1,9 +1,10 @@
-# fetch_mandi_data.py
+# fetch_mandi_scraper.py
 import os
 import requests
 import pandas as pd
 import logging
 import traceback
+from bs4 import BeautifulSoup
 from pymongo import MongoClient
 
 # CONFIG
@@ -12,51 +13,62 @@ MONGO_URI = (
     "@cluster0.nqrzb0c.mongodb.net/agriculture_db"
     "?retryWrites=true&w=majority&appName=Cluster0"
 )
-RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
-API_KEY = os.getenv("DATA_GOV_API_KEY") or ""
 DB_NAME = "agriculture_db"
 COLLECTION_NAME = "recent_crop_prices"
 LIMIT = 100
 
-
-# Logging to stdout
+# Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-def fetch_data():
-    if not API_KEY:
-        logging.error("DATA_GOV_API_KEY is not set in environment.")
-        return []
+# Example source (Agmarknet daily prices page)
+SOURCE_URL = "https://agmarknet.gov.in/SearchCmmMkt.aspx"  # replace with exact mandi data listing page
 
-    fields = "commodity,state,district,arrival_date,min_price,max_price,modal_price"
-    url = (
-        f"https://api.data.gov.in/resource/{RESOURCE_ID}"
-        f"?api-key={API_KEY}&format=json&offset=0&limit={LIMIT}&fields={fields}"
-    )
-    logging.info("Requesting URL: %s", url)
+def fetch_data():
+    logging.info("Requesting URL: %s", SOURCE_URL)
 
     try:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        payload = r.json()
-        records = payload.get("records", [])
-        logging.info("Fetched %d records from API", len(records))
-        return records
+        response = requests.get(SOURCE_URL, timeout=30)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Extract table (assuming first data table on page)
+        tables = pd.read_html(str(soup))
+        if not tables:
+            logging.error("No tables found on the page.")
+            return []
+
+        df = tables[0]  # take first table
+        logging.info("Fetched %d rows from web page", len(df))
+        return df
+
     except requests.exceptions.RequestException as e:
         logging.error("Request failed: %s", str(e))
-        return []
+        return pd.DataFrame()
     except Exception as e:
         logging.error("Unexpected error: %s", str(e))
-        return []
+        return pd.DataFrame()
 
-def process_records(records):
-    df = pd.DataFrame(records)
-    req_cols = ["arrival_date", "state", "district", "commodity", "min_price", "max_price", "modal_price"]
-    for c in req_cols:
-        if c not in df.columns:
-            df[c] = None
-    df = df[req_cols]
+def process_records(df):
+    req_cols = ["Arrival Date", "State", "District", "Commodity", "Min Price", "Max Price", "Modal Price"]
+    rename_map = {
+        "Arrival Date": "arrival_date",
+        "State": "state",
+        "District": "district",
+        "Commodity": "commodity",
+        "Min Price": "min_price",
+        "Max Price": "max_price",
+        "Modal Price": "modal_price",
+    }
+
+    # Keep only required columns
+    df = df[[c for c in req_cols if c in df.columns]]
+    df = df.rename(columns=rename_map)
+
+    # Normalize
     df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce", dayfirst=True)
     df = df.sort_values(by="arrival_date", ascending=False).head(LIMIT)
+
     return df
 
 def store_mongo(df):
@@ -64,27 +76,19 @@ def store_mongo(df):
         logging.info("No records to store.")
         return
 
-    if not MONGO_URI:
-        logging.error("MONGO_URI not set; cannot store to DB.")
-        return
-
     try:
         logging.info("Using MongoDB URI: %s", MONGO_URI)
         client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-
-        # Test connection
         client.server_info()
         logging.info("Connected to MongoDB successfully.")
 
         db = client[DB_NAME]
         col = db[COLLECTION_NAME]
 
-        # Convert NaT -> None and datetimes -> python datetime
         df_mongo = df.copy()
         df_mongo["arrival_date"] = df_mongo["arrival_date"].apply(lambda x: None if pd.isnull(x) else x.to_pydatetime())
         docs = df_mongo.to_dict(orient="records")
 
-        # Replace existing documents (simple approach)
         col.delete_many({})
         if docs:
             col.insert_many(docs)
@@ -97,11 +101,11 @@ def store_mongo(df):
 
 def main():
     logging.info("Job started")
-    records = fetch_data()
-    if not records:
+    df = fetch_data()
+    if df.empty:
         logging.info("No records fetched this run.")
         return
-    df = process_records(records)
+    df = process_records(df)
     store_mongo(df)
     logging.info("Job finished")
 
