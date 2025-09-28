@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: "0 2 * * *"   # runs daily at 2:00 UTC (7:30 AM IST)
   workflow_dispatch:       # allows manual trigger
+  schedule:            # automatic run
+    - cron: "30 2 * * *"   # runs at 2:30 AM UTC = 8:00 AM IST
 
 jobs:
   fetch:
