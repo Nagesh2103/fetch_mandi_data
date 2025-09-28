@@ -1,0 +1,27 @@
+name: Daily Mandi Data Fetch 
+on:
+  schedule:
+    - cron: "0 2 * * *"   # runs daily at 2:00 UTC (7:30 AM IST)
+  workflow_dispatch:       # allows manual trigger
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run fetch script
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+        run: python fetch_mandi_data.py
