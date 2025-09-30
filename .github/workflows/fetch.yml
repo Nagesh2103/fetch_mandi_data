@@ -18,11 +18,69 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Display execution context
+        run: |
+          echo "=========================================="
+          echo "EXECUTION CONTEXT"
+          echo "=========================================="
+          echo "Trigger Event: ${{ github.event_name }}"
+          echo "Current UTC Time: $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "Current IST Time: $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S')"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Python Version: 3.12"
+          echo "=========================================="
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          echo "Installing dependencies..."
+          pip install -r requirements.txt
+          echo ""
+          echo "Installed packages:"
+          pip list | grep -E "(pymongo|requests|pytz)" || echo "No matching packages found"
+
+      - name: Verify secrets
+        run: |
+          echo "Checking environment variables..."
+          if [ -z "$MONGO_URI" ]; then
+            echo "ERROR: MONGO_URI is empty or not set"
+            exit 1
+          else
+            echo "✓ MONGO_URI is set (length: ${#MONGO_URI})"
+          fi
+          
+          if [ -z "$DATA_GOV_API_KEY" ]; then
+            echo "ERROR: DATA_GOV_API_KEY is empty or not set"
+            exit 1
+          else
+            echo "✓ DATA_GOV_API_KEY is set (length: ${#DATA_GOV_API_KEY})"
+          fi
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
 
       - name: Run fetch script
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
-        run: python fetch_mandi_data.py
+          PYTHONUNBUFFERED: "1"
+          TRIGGER_TYPE: ${{ github.event_name }}
+        run: |
+          echo "=========================================="
+          echo "STARTING MANDI DATA FETCH"
+          echo "=========================================="
+          python fetch_mandi_data.py
+          EXIT_CODE=$?
+          echo "=========================================="
+          echo "Script exit code: $EXIT_CODE"
+          echo "=========================================="
+          exit $EXIT_CODE
+
+      - name: Check execution result
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✓ Workflow completed successfully"
+          else
+            echo "✗ Workflow failed"
+            exit 1
+          fi
