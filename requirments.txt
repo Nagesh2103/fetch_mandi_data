@@ -1,0 +1,8 @@
+# requirements.txt
+fastapi
+uvicorn
+pandas
+prophet
+pymongo
+joblib
+numpy==1.26.4  # <-- The critical version fix
