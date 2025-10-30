@@ -1,4 +1,3 @@
-# fetch_mandi_data.py
 import os
 import requests
 import pandas as pd
@@ -43,11 +42,22 @@ def fetch_data():
 
 def process_records(records):
     df = pd.DataFrame(records)
+    
+    # 🌟 NEW: Define the commodities to filter
+    COMMODITIES_TO_KEEP = ["Onion", "Tomato"]
+
     req_cols = ["arrival_date", "state", "district", "commodity", "min_price", "max_price", "modal_price"]
     for c in req_cols:
         if c not in df.columns:
             df[c] = None
+            
     df = df[req_cols]
+    
+    # 🌟 NEW: Filter the DataFrame for only 'Onion' and 'Tomato'
+    initial_count = len(df)
+    df = df[df["commodity"].isin(COMMODITIES_TO_KEEP)]
+    logging.info("Filtered data. Kept %d records out of %d for %s", len(df), initial_count, ", ".join(COMMODITIES_TO_KEEP))
+
     df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce", dayfirst=True)
     df = df.sort_values(by="arrival_date", ascending=False).head(LIMIT)
     return df
