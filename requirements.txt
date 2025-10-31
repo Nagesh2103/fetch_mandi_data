@@ -9,3 +9,4 @@ numpy
 pymongo
 joblib
 prophet
+requests
