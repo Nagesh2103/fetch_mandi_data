@@ -29,7 +29,9 @@ def fetch_data():
         logging.error("DATA_GOV_API_KEY is not set in environment.")
         return []
         
-    fields = "commodity,state,district,arrival_date,min_price,max_price,modal_price"
+    # ⭐ CHANGE 1: Added 'variety' to the requested fields
+    fields = "commodity,state,district,market,variety,arrival_date,min_price,max_price,modal_price"
+    
     url = (
         f"https://api.data.gov.in/resource/{RESOURCE_ID}"
         f"?api-key={API_KEY}&format=json&offset=0&limit={LIMIT}&fields={fields}"
@@ -58,7 +60,8 @@ def process_records(records):
     """
     df = pd.DataFrame(records)
 
-    req_cols = ["arrival_date", "state", "district", "commodity", "min_price", "max_price", "modal_price"]
+    # ⭐ CHANGE 2: Added 'variety' and 'market' to the required columns
+    req_cols = ["arrival_date", "state", "district", "market", "commodity", "variety", "min_price", "max_price", "modal_price"]
     for c in req_cols:
         if c not in df.columns:
             df[c] = None
@@ -84,7 +87,7 @@ def process_records(records):
 # --- DATABASE STORAGE ---
 def store_mongo(df):
     """
-    Performs a bulk upsert into MongoDB using the 4 key fields as a unique identifier.
+    Performs a bulk upsert into MongoDB using the 5 key fields as a unique identifier.
     """
     if df.empty:
         logging.info("No records to store.")
@@ -98,13 +101,16 @@ def store_mongo(df):
         db = client[DB_NAME]
         col = db[COLLECTION_NAME]
         
-        # ⭐ ENHANCEMENT: Create a unique compound index for efficient upserts
+        # ⭐ CHANGE 3A: Updated index to include 'variety' and 'market'
+        # Market is typically required for unique price data alongside location/commodity/variety/date
         col.create_index([
-            ("commodity", 1), 
-            ("state", 1), 
-            ("district", 1), 
-            ("arrival_date", -1) # Index date descending for retrieval efficiency
-        ], unique=True, name="unique_mandi_price")
+            ("commodity", 1),
+            ("variety", 1), # Added variety
+            ("state", 1),
+            ("district", 1),
+            ("market", 1),   # Added market for a more robust unique key
+            ("arrival_date", -1) 
+        ], unique=True, name="unique_mandi_price_with_variety")
         logging.info("Ensured unique compound index exists.")
         
         df_mongo = df.copy()
@@ -117,11 +123,13 @@ def store_mongo(df):
         
         requests = []
         for doc in docs:
-            # Define the unique key for matching/upserting
+            # ⭐ CHANGE 3B: Updated query for matching/upserting to include 'variety' and 'market'
             query = {
                 "commodity": doc.get("commodity"),
+                "variety": doc.get("variety"),     # Added variety
                 "state": doc.get("state"),
                 "district": doc.get("district"),
+                "market": doc.get("market"),       # Added market
                 "arrival_date": doc.get("arrival_date")
             }
             
