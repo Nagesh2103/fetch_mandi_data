@@ -20,6 +20,26 @@ class ForecastRequest(BaseModel):
     crop_name: str
     variety_name: str
 
+@app.get("/test-files")
+def test_files():
+    """
+    A debug endpoint to see the file structure on the server.
+    """
+    root_path = "./"
+    models_path = "./models"
+    
+    root_files = os.listdir(root_path)
+    
+    models_files = []
+    if os.path.exists(models_path):
+        models_files = os.listdir(models_path)
+    else:
+        models_files = [f"ERROR: '{models_path}' folder does not exist!"]
+    
+    return {
+        "files_at_root (./)": root_files,
+        "files_in_models_folder (./models)": models_files
+    }
 @app.get("/")
 def read_root():
     return {"status": "Forecast API is running."}
@@ -54,4 +74,5 @@ async def get_forecast(request: ForecastRequest):
 # This allows the script to be run directly for testing
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
+
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
