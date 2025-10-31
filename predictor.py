@@ -73,15 +73,26 @@ def get_live_forecast(crop_name, variety_name):
         print(f"Error: Not enough recent data in MongoDB (found {len(recent_data)} records).")
         return None
 
-    # --- C: Prepare Data for Prediction ---
+# --- C: Prepare Data for Prediction ---
     recent_data = recent_data.rename(columns={'arrival_date': 'ds', 'modal_price': 'y'})
     recent_data['ds'] = pd.to_datetime(recent_data['ds'])
     recent_data = recent_data.sort_values(by='ds').reset_index(drop=True) 
     
+    # --- THIS IS THE FIX ---
+    # Convert price columns from string (from MongoDB) to numeric
+    recent_data['y'] = pd.to_numeric(recent_data['y'], errors='coerce')
+    recent_data['min_price'] = pd.to_numeric(recent_data['min_price'], errors='coerce')
+    recent_data['max_price'] = pd.to_numeric(recent_data['max_price'], errors='coerce')
+    
+    # Drop any rows that failed conversion (e.g., had text)
+    recent_data = recent_data.dropna(subset=['y', 'min_price', 'max_price'])
+    # -----------------------
+
     # Log-transform all features
-    recent_data['y'] = np.log1p(recent_data['y'])
+    recent_data['y'] = np.log1p(recent_data['y'])  # <--- This will now work
     recent_data['min_price'] = np.log1p(recent_data['min_price'])
     recent_data['max_price'] = np.log1p(recent_data['max_price'])
+
     recent_data['Yesterday Price'] = recent_data['y'].shift(1)
     
     # Get the last 7 days to start the forecast
@@ -105,3 +116,4 @@ def get_live_forecast(crop_name, variety_name):
     final_forecast[['yhat_lower', 'yhat_upper']] = np.expm1(final_forecast[['yhat_lower', 'yhat_upper']])
     
     return final_forecast[['ds', 'predicted_price', 'yhat_lower', 'yhat_upper']]
+
