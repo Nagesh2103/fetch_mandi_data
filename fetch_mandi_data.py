@@ -29,7 +29,7 @@ def fetch_data():
         logging.error("DATA_GOV_API_KEY is not set in environment.")
         return []
         
-    # ⭐ CHANGE 1: Added 'variety' to the requested fields
+    # Fields include commodity, variety, and market
     fields = "commodity,state,district,market,variety,arrival_date,min_price,max_price,modal_price"
     
     url = (
@@ -56,17 +56,25 @@ def fetch_data():
 def process_records(records):
     """
     Converts records to a DataFrame, filters for target commodities,
-    and keeps only records from the last DAYS_TO_KEEP.
+    cleans price data, and keeps only recent records.
     """
     df = pd.DataFrame(records)
 
-    # ⭐ CHANGE 2: Added 'variety' and 'market' to the required columns
     req_cols = ["arrival_date", "state", "district", "market", "commodity", "variety", "min_price", "max_price", "modal_price"]
     for c in req_cols:
         if c not in df.columns:
             df[c] = None
             
     df = df[req_cols]
+    
+    # ⭐ FIX: Ensure price columns are strictly numeric
+    price_cols = ["min_price", "max_price", "modal_price"]
+    for col in price_cols:
+        # Convert to numeric, setting non-numeric values (like 'N/A' or '-') to NaN
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+    # Drop rows where the primary price (modal_price) is NaN after coercion
+    df = df.dropna(subset=['modal_price']).copy()
     
     # 1. Filter by Commodity
     initial_count = len(df)
@@ -101,14 +109,13 @@ def store_mongo(df):
         db = client[DB_NAME]
         col = db[COLLECTION_NAME]
         
-        # ⭐ CHANGE 3A: Updated index to include 'variety' and 'market'
-        # Market is typically required for unique price data alongside location/commodity/variety/date
+        # Unique compound index includes commodity, variety, location, market, and date
         col.create_index([
             ("commodity", 1),
-            ("variety", 1), # Added variety
+            ("variety", 1), 
             ("state", 1),
             ("district", 1),
-            ("market", 1),   # Added market for a more robust unique key
+            ("market", 1),   
             ("arrival_date", -1) 
         ], unique=True, name="unique_mandi_price_with_variety")
         logging.info("Ensured unique compound index exists.")
@@ -123,13 +130,13 @@ def store_mongo(df):
         
         requests = []
         for doc in docs:
-            # ⭐ CHANGE 3B: Updated query for matching/upserting to include 'variety' and 'market'
+            # Define the unique key for matching/upserting
             query = {
                 "commodity": doc.get("commodity"),
-                "variety": doc.get("variety"),     # Added variety
+                "variety": doc.get("variety"),     
                 "state": doc.get("state"),
                 "district": doc.get("district"),
-                "market": doc.get("market"),       # Added market
+                "market": doc.get("market"),       
                 "arrival_date": doc.get("arrival_date")
             }
             
