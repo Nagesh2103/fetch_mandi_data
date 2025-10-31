@@ -6,25 +6,41 @@ import numpy as np
 import joblib  # For loading models
 from pymongo import MongoClient
 import os
+import traceback  # <-- ADDED for detailed error logging
 
 # --- 1. CONFIGURATION ---
-# (Get details from your teammate's file)
-MONGO_URI = os.getenv("MONGO_URI") # Or hardcode your string for testing
+MONGO_URI = os.getenv("MONGO_URI") # Get URI securely from environment
 DB_NAME = "agriculture_db"
 COLLECTION_NAME = "recent_crop_prices"
-
-# This path will be where the models are in the FINAL project
-# (e.g., a 'models' folder in the project)
 MODEL_DIR = "./models/" 
 
 # --- 2. CONNECT TO MONGODB ---
+# This block runs once when the application starts (imported by app.py)
+
+# Check if the connection string is actually available
+if not MONGO_URI:
+    # Raise a fatal error if MONGO_URI is missing, preventing service start
+    print("FATAL ERROR: MONGO_URI environment variable is not set.")
+    raise ValueError("MONGO_URI not configured.")
+
 try:
-    client = MongoClient(MONGO_URI)
+    # Increased timeout for robustness on cloud deployment (e.g., 10 seconds)
+    # This prevents the application from stalling forever if the connection is slow.
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000) 
+    
+    # Test the connection immediately. This command will block up to the timeout.
+    client.admin.command('ismaster')
+    
     db = client[DB_NAME]
     collection = db[COLLECTION_NAME]
     print("Successfully connected to MongoDB.")
+    
 except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
+    # Log the full stack trace which is CRUCIAL for debugging deployment failures
+    print(f"FATAL Error connecting to MongoDB: {e}")
+    print(traceback.format_exc())
+    # Re-raise a ConnectionError to signal startup failure cleanly
+    raise ConnectionError(f"Failed to connect to MongoDB at startup: {e}")
     
 # --- 3. THE PREDICTION FUNCTION ---
 def get_live_forecast(crop_name, variety_name):
@@ -45,10 +61,11 @@ def get_live_forecast(crop_name, variety_name):
     # --- B: Get Recent Data from MongoDB ---
     query = {
         "commodity": crop_name,
-        "variety": variety_name
+        # NOTE on 'variety': This field must exist and be populated in your MongoDB collection
+        # (by fetch_mandi_data.py) for this query to work.
+        "variety": variety_name 
     }
     # Find data, sort by date descending, and get the last 10 (to be safe)
-    # Your teammate's file uses 'arrival_date'
     cursor = collection.find(query).sort("arrival_date", -1).limit(10)
     recent_data = pd.DataFrame(list(cursor))
     
@@ -57,10 +74,9 @@ def get_live_forecast(crop_name, variety_name):
         return None
 
     # --- C: Prepare Data for Prediction ---
-    # (Must match the training data format)
     recent_data = recent_data.rename(columns={'arrival_date': 'ds', 'modal_price': 'y'})
     recent_data['ds'] = pd.to_datetime(recent_data['ds'])
-    recent_data = recent_data.sort_values(by='ds').reset_index(drop=True) # Sort ascending
+    recent_data = recent_data.sort_values(by='ds').reset_index(drop=True) 
     
     # Log-transform all features
     recent_data['y'] = np.log1p(recent_data['y'])
@@ -70,7 +86,7 @@ def get_live_forecast(crop_name, variety_name):
     
     # Get the last 7 days to start the forecast
     future_df = recent_data.iloc[-7:].copy()
-    future_df['Yesterday Price'] = future_df['Yesterday Price'].bfill() # Fill the one NaN
+    future_df['Yesterday Price'] = future_df['Yesterday Price'].bfill()
 
     # --- D: Run the Recursive Forecast ---
     for i in range(7):
@@ -89,16 +105,3 @@ def get_live_forecast(crop_name, variety_name):
     final_forecast[['yhat_lower', 'yhat_upper']] = np.expm1(final_forecast[['yhat_lower', 'yhat_upper']])
     
     return final_forecast[['ds', 'predicted_price', 'yhat_lower', 'yhat_upper']]
-
-# --- 4. EXAMPLE OF HOW THE CHATBOT USES THIS ---
-# (This part would be in your main app.py or rasa_actions.py)
-
-# if __name__ == "__main__":
-#     print("Running a test forecast for 'Onion' - 'Other'")
-#     
-#     # This assumes your teammate's script has run and MongoDB is populated
-#     forecast = get_live_forecast(crop_name='Onion', variety_name='Other')
-#     
-#     if forecast is not None:
-#         print("\nFinal 7-Day Forecast (in Rupees):")
-#         print(forecast)
