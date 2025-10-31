@@ -67,21 +67,28 @@ def process_records(records):
             
     df = df[req_cols]
     
-    # ⭐ FIX: Ensure price columns are strictly numeric
+    # 1. CLEANING: Ensure price columns are strictly numeric
     price_cols = ["min_price", "max_price", "modal_price"]
     for col in price_cols:
-        # Convert to numeric, setting non-numeric values (like 'N/A' or '-') to NaN
+        # Convert to numeric, setting non-numeric values to NaN
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
     # Drop rows where the primary price (modal_price) is NaN after coercion
     df = df.dropna(subset=['modal_price']).copy()
     
-    # 1. Filter by Commodity
+    # ⭐ FINAL FIX: Filter out non-positive prices to prevent log(0) errors
+    initial_count_after_coerce = len(df)
+    df = df[df['modal_price'] > 0].copy() 
+    
+    # Use f-string with formatting for clarity
+    logging.info(f"Filtered out {initial_count_after_coerce - len(df)} records where modal_price was $\\le 0$.")
+    
+    # 2. Filter by Commodity
     initial_count = len(df)
     df = df[df["commodity"].isin(COMMODITIES_TO_KEEP)].copy()
     logging.info("Filtered data. Kept %d records out of %d for %s", len(df), initial_count, ", ".join(COMMODITIES_TO_KEEP))
 
-    # 2. Filter by Date (The 20-day logic)
+    # 3. Filter by Date (The 20-day logic)
     df["arrival_date"] = pd.to_datetime(df["arrival_date"], errors="coerce", dayfirst=True)
     df = df.dropna(subset=["arrival_date"])
 
