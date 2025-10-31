@@ -13,7 +13,8 @@ MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = "agriculture_db"
 COLLECTION_NAME = "recent_crop_prices"
 # Set a higher limit to ensure enough data is fetched to cover the last 20 days
-LIMIT = 500
+LIMIT = 499
+
 
 # Logging to stdout so Render captures it
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
