@@ -1,3 +1,7 @@
-__pycache__/ 
-venv/ 
-logs/ 
+# Ignore the cron job script from the main web service deployment
+fetch_mandi_data.py
+
+# Also ensure you ignore virtual environment files
+.venv/
+venv/
+__pycache__/
