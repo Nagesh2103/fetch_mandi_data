@@ -5,6 +5,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import os
+import traceback # For detailed error logging
 
 # Import the predictor function you already built
 from predictor import get_live_forecast
@@ -39,7 +40,8 @@ def test_files():
     return {
         "files_at_root (./)": root_files,
         "files_in_models_folder (./models)": models_files
-    }
+    }
+
 @app.get("/")
 def read_root():
     return {"status": "Forecast API is running."}
@@ -60,7 +62,14 @@ async def get_forecast(request: ForecastRequest):
         )
         
         if forecast_df is None:
-            raise HTTPException(status_code=404, detail="Could not generate forecast. Data may be missing.")
+            # Check if this was a file-not-found error or a data-not-found error
+            model_filename = f"./models/{request.crop_name.lower()}_{request.variety_name.lower()}_model.joblib"
+            if not os.path.exists(model_filename):
+                print(f"CRITICAL: Model file not found at {model_filename}")
+                raise HTTPException(status_code=404, detail=f"Model file not found: {model_filename}")
+            else:
+                print(f"WARNING: Model loaded, but no recent data found in MongoDB for {request.crop_name}")
+                raise HTTPException(status_code=404, detail="Could not generate forecast. No recent data in MongoDB.")
             
         # Convert the DataFrame to a JSON format that Botpress can read
         forecast_json = forecast_df.to_dict(orient="records")
@@ -68,11 +77,12 @@ async def get_forecast(request: ForecastRequest):
         return {"forecast": forecast_json}
 
     except Exception as e:
-        print(f"Error during forecast: {e}")
+        print(f"Error during forecast: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # This allows the script to be run directly for testing
-if __name__ == "__main__":
+# --- THIS IS THE FIX ---
+if _name_ == "_main_":
+# -----------------------
     port = int(os.getenv("PORT", 8000))
-
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
