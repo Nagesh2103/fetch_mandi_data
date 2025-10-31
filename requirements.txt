@@ -1,6 +1,10 @@
-flask
-pymongo
-requests
+# Ensure uvicorn is listed like this (the simplest form):
+uvicorn
+# OR, the most robust form:
+uvicorn[standard]
+# ... along with all your other libraries:
+fastapi
 pandas
-gunicorn
-
+numpy
+pymongo
+joblib
