@@ -38,7 +38,7 @@ def get_live_forecast(district_name, crop_name, variety_name):
     
     # --- !!!!! THIS IS THE FIX !!!!! ---
     # This line correctly adds the underscores to match your saved files.
-    model_filename = f"{MODEL_DIR}{district_name.lower()}{crop_name.lower()}{variety_name.lower()}_model.joblib"
+    model_filename = f"{MODEL_DIR}{district_name.lower()}_{crop_name.lower()}_{variety_name.lower()}_model.joblib"
     # -----------------------------------
     
     try:
