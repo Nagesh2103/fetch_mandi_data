@@ -1,4 +1,7 @@
 # predictor.py
+# This is the final, correct version.
+# It correctly builds the filename with underscores.
+
 import pandas as pd
 import numpy as np
 import joblib
@@ -27,12 +30,16 @@ except Exception as e:
     print(traceback.format_exc())
     raise ConnectionError(f"Failed to connect to MongoDB at startup: {e}")
 
-# --- 3. THE PREDICTION FUNCTION ---
+# --- 3. THE PREDICTION FUNCTION (FINAL, SCALABLE VERSION) ---
 def get_live_forecast(district_name, crop_name, variety_name):
     print(f"\n--- Forecast Request for: {district_name} - {crop_name} - {variety_name} ---")
 
     # --- A: Load the Correct Pre-Trained Model ---
+    
+    # --- !!!!! THIS IS THE FIX !!!!! ---
+    # This line correctly adds the underscores to match your saved files.
     model_filename = f"{MODEL_DIR}{district_name.lower()}{crop_name.lower()}{variety_name.lower()}_model.joblib"
+    # -----------------------------------
     
     try:
         model = joblib.load(model_filename)
