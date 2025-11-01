@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 # --- CONFIG ---
 RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
-API_KEY = os.getenv("DATA_GOV_API_KEY") or "" 
+API_KEY = os.getenv("DATA_GOV_API_KEY") or ""
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = "agriculture_db"
 COLLECTION_NAME = "recent_crop_prices"
