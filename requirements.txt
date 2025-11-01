@@ -5,7 +5,7 @@ uvicorn[standard]
 # ... along with all your other libraries:
 fastapi
 pandas
-numpy
+numpy==1.26.4
 pymongo
 joblib
 prophet
