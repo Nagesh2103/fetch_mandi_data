@@ -34,10 +34,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 # --- DATA FETCHING (No Change Required Here) ---
 def fetch_data():
-    """Fetches the latest mandi price data from the data.gov.in API."""
-    if not API_KEY:
-        logging.error("DATA_GOV_API_KEY is not set in environment.")
-        return []
+    """Fetches the latest mandi price data from the data.gov.in API."""
+    if not API_KEY:
+        logging.error("DATA_GOV_API_KEY is not set in environment.")
+        return []
         
     # Fields include commodity, variety, and market
     fields = "commodity,state,district,market,variety,arrival_date,min_price,max_price,modal_price"
