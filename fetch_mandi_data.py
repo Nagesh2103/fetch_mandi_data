@@ -20,8 +20,7 @@ LIMIT = 499
 COMMODITIES_TO_KEEP = ["Onion"]
 DAYS_TO_KEEP = 20
 
-# ⭐ STATE AND DISTRICT FILTERING CONSTANTS ⭐
-# Note: Filters are applied as case-insensitive to match common API inconsistencies.
+# ⭐ STATE AND DISTRICT FILTERING CONSTANTS (For Maharashtra) ⭐
 TARGET_STATE = "Maharashtra"
 TARGET_DISTRICTS = [
     "Ahmednagar", "Akola", "Amarawati", "Beed", "Buldhana", "Chandrapur",
@@ -72,8 +71,9 @@ def process_records(records):
     cleans and filters for Maharashtra districts, and keeps only recent records.
     """
     if not records:
-        return pd.DataFrame() # Return empty DataFrame if no records fetched
-        
+        logging.info("No records received from API. Returning empty DataFrame.")
+        return pd.DataFrame()
+
     df = pd.DataFrame(records)
 
     req_cols = [
@@ -86,7 +86,7 @@ def process_records(records):
 
     df = df[req_cols]
 
-    # 1. CLEANING: Ensure price columns are numeric
+    # 1. CLEANING: Ensure price columns are numeric and drop invalid prices
     price_cols = ["min_price", "max_price", "modal_price"]
     for col in price_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -97,21 +97,24 @@ def process_records(records):
     df = df[df['modal_price'] > 0].copy()
     logging.info(f"Filtered out {initial_count_after_coerce - len(df)} records where modal_price <= 0.")
 
-    # 2. Filter by Commodity
+    # 2. Filter by Commodity (Case-insensitive check)
     initial_count = len(df)
-    # Ensure commodity column is treated as string for case-insensitive comparison
     df["commodity"] = df["commodity"].astype(str)
     df = df[df["commodity"].str.lower().isin([c.lower() for c in COMMODITIES_TO_KEEP])].copy()
     logging.info("Filtered data. Kept %d records out of %d for %s", len(df), initial_count, ", ".join(COMMODITIES_TO_KEEP))
+    
+    # Early exit if no commodity data remains
+    if df.empty:
+        return df
 
-    # 3. FILTER BY STATE AND DISTRICT (CASE-INSENSITIVE)
+    # 3. FILTER BY STATE AND DISTRICT (Robust Case-Insensitive Filtering)
     maharashtra_count = len(df)
     
-    # State filter (Case-insensitive)
+    # State filter
     df["state"] = df["state"].astype(str)
     df = df[df["state"].str.lower() == TARGET_STATE.lower()].copy()
 
-    # District filter (Case-insensitive)
+    # District filter
     target_districts_lower = [d.lower() for d in TARGET_DISTRICTS]
     df["district"] = df["district"].astype(str)
     df = df[df["district"].str.lower().isin(target_districts_lower)].copy()
@@ -145,6 +148,7 @@ def store_mongo(df):
 
     try:
         client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        
         # --- CONNECTION CHECK ---
         client.admin.command('ping')
         logging.info("Successfully pinged MongoDB server.")
