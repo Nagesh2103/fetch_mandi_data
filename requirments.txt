@@ -5,4 +5,7 @@ pandas
 prophet
 pymongo
 joblib
+gunicorn
+
+
 numpy==1.26.4  # <-- The critical version fix
