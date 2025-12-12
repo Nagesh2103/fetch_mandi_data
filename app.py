@@ -55,7 +55,11 @@ async def get_forecast(request: ForecastRequest):
         print(f"Error during forecast: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    # Directly provide the app object instead of string reference
+    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+
+
 
