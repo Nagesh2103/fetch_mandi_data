@@ -10,3 +10,4 @@ pymongo
 joblib
 prophet
 requests
+gunicorn
