@@ -6,6 +6,10 @@ prophet
 pymongo
 joblib
 gunicorn
+Flask==2.3.2
+gunicorn==21.2.0
+# other deps...
 
 
 numpy==1.26.4  # <-- The critical version fix
+
