@@ -12,7 +12,7 @@ import traceback
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = "agriculture_db"
 COLLECTION_NAME = "recent_crop_prices"
-MODEL_DIR = "./models/"
+MODEL_DIR = "./models1/"
 
 # --- 2. CONNECT TO MONGODB ---
 if not MONGO_URI:
@@ -111,3 +111,4 @@ def get_live_forecast(district_name, crop_name, variety_name):
     final_forecast["yhat_upper"] = np.expm1(final_forecast["yhat_upper"])
 
     return final_forecast[["ds", "predicted_price", "yhat_lower", "yhat_upper"]]
+
